@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits, Events } from 'discord.js';
 import { config, validateConfig, MEMBER_ROLE_NAME, NEW_MEMBER_GRACE_DAYS } from './config.js';
 import { db } from './db.js';
 import { kstParts, kstDateMinusDays, kstMondayOf } from './time.js';
+import { syncLevelRole } from './levels.js';
 import { handleVoiceStateUpdate, recoverOnStartup } from './attendance.js';
 import { registerCommands, handleInteraction } from './commands.js';
 import { registerSchedules } from './scheduler.js';
@@ -33,6 +34,9 @@ client.once(Events.ClientReady, async (c) => {
     announce: (text) =>
       announceChannel.send({ content: text }).catch((err) => console.error('[announce]', err)),
   };
+  // 출석이 새로 인정될 때 레벨 역할 동기화 (attendance.js에서 호출)
+  ctx.syncLevel = (userId) =>
+    syncLevelRole(ctx, userId).catch((err) => console.error('[level]', err));
 
   await registerCommands(guild);
   console.log('[ready] 슬래시 명령어 등록 완료');

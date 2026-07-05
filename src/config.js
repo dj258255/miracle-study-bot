@@ -39,6 +39,20 @@ export const WEEKLY_CRON = '5 22 * * 0';
 
 export const TIMEZONE = 'Asia/Seoul';
 
+// 레벨 정의 — 누적 출석 횟수(min) 이상이면 해당 레벨. 역할 자동 부여 + 칭호 표시에 사용.
+export const LEVELS = [
+  { lv: 1, name: '새싹', emoji: '🌱', min: 1, color: 0x2ecc71 },
+  { lv: 2, name: '뿌리내림', emoji: '🌿', min: 10, color: 0x1abc9c },
+  { lv: 3, name: '꾸준나무', emoji: '🌳', min: 25, color: 0x3498db },
+  { lv: 4, name: '불꽃', emoji: '🔥', min: 50, color: 0xe67e22 },
+  { lv: 5, name: '고인물', emoji: '💎', min: 100, color: 0x9b59b6 },
+];
+
+// 랭킹 공지에 표시할 최대 인원
+export const RANK_TOP_N = 10;
+// 월간 랭킹 크론 — 매월 1일 00:05 KST (지난달 집계)
+export const MONTHLY_RANK_CRON = '5 0 1 * *';
+
 export function validateConfig() {
   const missing = [];
   if (!config.token) missing.push('DISCORD_TOKEN');

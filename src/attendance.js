@@ -159,7 +159,10 @@ export function finalizeSession(ctx, date, session, { notify = true } = {}) {
     const preExisting = db.hasAttendanceOnDate(userId, date); // 다른 시간대에서 이미 인정?
     const mins = cumulativeMinutes(userId, date, session);
     const recognized = mins >= REQUIRED_MINUTES;
-    if (recognized) db.insertAttendance(userId, date, key, mins); // 하루 1회 (PK가 강제)
+    if (recognized) {
+      const inserted = db.insertAttendance(userId, date, key, mins); // 하루 1회 (PK가 강제)
+      if (inserted.changes > 0) ctx.syncLevel?.(userId); // 새 출석 → 레벨 갱신 (비동기, 실패 무해)
+    }
 
     if (notify && !state.notified.has(userId)) {
       const name = nameOf(userId, ctx);

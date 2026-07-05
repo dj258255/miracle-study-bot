@@ -2,6 +2,7 @@ import { SlashCommandBuilder, MessageFlags, PermissionFlagsBits } from 'discord.
 import { WEEKLY_REQUIRED_DAYS, MAX_WARNINGS, NEW_MEMBER_GRACE_DAYS } from './config.js';
 import { db } from './db.js';
 import { kstParts, kstMondayOf, kstDateMinusDays } from './time.js';
+import { levelFor, nextLevel } from './levels.js';
 
 export const commands = [
   new SlashCommandBuilder()
@@ -51,6 +52,18 @@ export async function handleInteraction(interaction) {
       `- ${remaining === 0 ? '이번 주 기준 충족 ✅' : `일요일까지 ${remaining}회 더 필요해요`}`,
       `- 경고: ${warn}/${MAX_WARNINGS}`,
     ];
+
+    // 레벨 (누적 출석 기준)
+    const total = db.countAttendanceTotal(userId);
+    const lv = levelFor(total);
+    const nxt = nextLevel(total);
+    if (lv) {
+      lines.push(
+        `- 레벨: Lv.${lv.lv} ${lv.emoji} ${lv.name} (누적 ${total}회${nxt ? `, 다음 레벨까지 ${nxt.min - total}회` : ' — 최고 레벨!'})`
+      );
+    } else {
+      lines.push(`- 레벨: 아직 없음 — 첫 출석을 인정받으면 Lv.1 🌱 새싹!`);
+    }
     const until = db.getExemption(userId);
     if (until && until >= date) lines.push(`- 유예 중: ${until}까지 점검 제외 🛌`);
     else if (until && until >= weekStart) lines.push(`- 유예 종료 — 이번 주 점검은 면제 🛌 (다음 주부터 다시 적용)`);

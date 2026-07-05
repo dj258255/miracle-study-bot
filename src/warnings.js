@@ -7,6 +7,7 @@ import {
 } from './config.js';
 import { db } from './db.js';
 import { kstParts, kstMondayOf, kstDateMinusDays } from './time.js';
+import { postWeeklyRanking } from './ranking.js';
 
 function isStaff(member) {
   return (
@@ -43,6 +44,9 @@ export async function runWeeklyCheck(ctx) {
   const nowIso = new Date().toISOString();
 
   await ctx.guild.members.fetch(); // 전체 멤버 캐시 확보
+
+  // 점검(경고)에 앞서 이번 주 랭킹부터 공지 — 긍정적인 소식 먼저
+  await postWeeklyRanking(ctx).catch((e) => console.error('[rank]', e));
 
   for (const [userId, member] of ctx.guild.members.cache) {
     if (member.user.bot) continue;

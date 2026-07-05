@@ -89,6 +89,14 @@ const stmt = {
   countAttendanceSince: sqlite.prepare(
     `SELECT COUNT(*) AS n FROM attendance WHERE user_id=? AND date>=?`
   ),
+  countAttendanceTotal: sqlite.prepare(
+    `SELECT COUNT(*) AS n FROM attendance WHERE user_id=?`
+  ),
+  rankBetween: sqlite.prepare(
+    `SELECT user_id, COUNT(*) AS days, SUM(minutes) AS mins
+     FROM attendance WHERE date>=? AND date<=?
+     GROUP BY user_id ORDER BY days DESC, mins DESC`
+  ),
 
   isFinalized: sqlite.prepare(`SELECT 1 FROM finalized_sessions WHERE date=? AND session=? LIMIT 1`),
   markFinalized: sqlite.prepare(
@@ -145,6 +153,8 @@ export const db = {
   hasAttendanceOnDate: (user, date) => !!stmt.hasAttendanceOnDate.get(user, date),
   countAttendanceSince: (user, sinceDate) =>
     stmt.countAttendanceSince.get(user, sinceDate).n,
+  countAttendanceTotal: (user) => stmt.countAttendanceTotal.get(user).n,
+  rankBetween: (from, to) => stmt.rankBetween.all(from, to),
 
   isFinalized: (date, session) => !!stmt.isFinalized.get(date, session),
   markFinalized: (date, session) => stmt.markFinalized.run(date, session),
