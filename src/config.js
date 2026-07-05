@@ -10,6 +10,8 @@ export const config = {
     .filter(Boolean),
   // 출근/퇴근/경고 메시지를 올릴 텍스트 채널 ID
   announceChannelId: process.env.ANNOUNCE_CHANNEL_ID,
+  // 새 멤버 환영 인사를 올릴 텍스트 채널 ID (비워두면 환영 메시지 비활성화)
+  welcomeChannelId: process.env.WELCOME_CHANNEL_ID ?? '',
 };
 
 // 스터디 시간대 정의 (KST). 테스트 시 start/end만 가까운 시각으로 바꾸면 전체 흐름을 짧게 검증할 수 있다.

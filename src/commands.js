@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, MessageFlags, PermissionFlagsBits } from 'discord.js';
-import { WEEKLY_REQUIRED_DAYS, MAX_WARNINGS } from './config.js';
+import { WEEKLY_REQUIRED_DAYS, MAX_WARNINGS, NEW_MEMBER_GRACE_DAYS } from './config.js';
 import { db } from './db.js';
 import { kstParts, kstMondayOf, kstDateMinusDays } from './time.js';
 
@@ -54,6 +54,16 @@ export async function handleInteraction(interaction) {
     const until = db.getExemption(userId);
     if (until && until >= date) lines.push(`- 유예 중: ${until}까지 점검 제외 🛌`);
     else if (until && until >= weekStart) lines.push(`- 유예 종료 — 이번 주 점검은 면제 🛌 (다음 주부터 다시 적용)`);
+
+    // 신입 적응 기간(가입+7일)이 이번 주에 걸쳐 있으면 점검 시작일 안내
+    const joinedTs = interaction.member?.joinedTimestamp;
+    if (joinedTs) {
+      const graceEnd = kstDateMinusDays(kstParts(new Date(joinedTs)).date, -NEW_MEMBER_GRACE_DAYS);
+      if (graceEnd >= weekStart) {
+        const resume = kstDateMinusDays(kstMondayOf(graceEnd), -7);
+        lines.push(`- 신규 적응 기간: ${resume}(월)부터 출석 점검 적용 🌱`);
+      }
+    }
 
     await interaction.reply({ content: lines.join('\n'), flags: MessageFlags.Ephemeral });
     return;
