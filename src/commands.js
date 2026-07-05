@@ -63,9 +63,12 @@ export async function handleInteraction(interaction) {
     const target = interaction.options.getUser('대상', true);
     const days = interaction.options.getInteger('일수', true);
     const until = kstDateMinusDays(date, -days); // 오늘 + N일
+    // 유예가 걸친 주는 통째로 면제 → 점검 재개는 그다음 주 월요일부터
+    const resume = kstDateMinusDays(kstMondayOf(until), -7);
     db.setExemption(target.id, until, interaction.user.id, new Date().toISOString());
     await interaction.reply(
-      `🛌 **${target.displayName}**님을 **${until}**까지 출석 점검에서 제외합니다. 기간이 지나면 자동으로 복귀돼요.`
+      `🛌 **${target.displayName}**님을 **${until}**까지 출석 점검에서 제외합니다.\n` +
+        `유예가 걸친 주는 통째로 면제되고, **${resume}(월)부터** 점검이 다시 적용돼요.`
     );
     return;
   }
