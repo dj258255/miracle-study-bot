@@ -5,19 +5,24 @@ import { levelFor } from './levels.js';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
-// 기간 내 출석 순위 줄들 (현재 서버 멤버만, 출석일 → 누적시간 순).
+// 기간 내 출석 순위 줄들 (현재 서버 멤버만).
+// 정렬: 출석일 → 누적 공부시간. 일수·시간이 모두 같으면 공동 순위 (다음 순위는 건너뜀: 1,1,3).
 function rankingLines(ctx, from, to) {
-  return db
-    .rankBetween(from, to)
-    .filter((r) => ctx.guild.members.cache.has(r.user_id))
-    .slice(0, RANK_TOP_N)
-    .map((r, i) => {
-      const member = ctx.guild.members.cache.get(r.user_id);
-      const lv = levelFor(db.countAttendanceTotal(r.user_id));
-      const badge = lv ? `${lv.emoji} ` : '';
-      const rank = MEDALS[i] ?? `${i + 1}위`;
-      return `${rank} ${badge}**${member.displayName}** — ${r.days}일 · ${fmtDuration(r.mins)}`;
-    });
+  const rows = db.rankBetween(from, to).filter((r) => ctx.guild.members.cache.has(r.user_id));
+
+  rows.forEach((r, i) => {
+    const prev = rows[i - 1];
+    r.rank = prev && prev.days === r.days && prev.mins === r.mins ? prev.rank : i + 1;
+  });
+
+  return rows.slice(0, RANK_TOP_N).map((r) => {
+    const member = ctx.guild.members.cache.get(r.user_id);
+    const lv = levelFor(db.countAttendanceTotal(r.user_id));
+    const badge = lv ? `${lv.emoji} ` : '';
+    const sym = MEDALS[r.rank - 1] ?? `${r.rank}위`;
+    const tie = rows.filter((o) => o.rank === r.rank).length > 1 ? ' (공동)' : '';
+    return `${sym} ${badge}**${member.displayName}** — ${r.days}일 · ${fmtDuration(r.mins)}${tie}`;
+  });
 }
 
 // 주간 랭킹 — 일요일 22:05 주간 점검 직전에 호출 (이번 주 월~일 집계).
