@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, Events } from 'discord.js';
 import { config, validateConfig, MEMBER_ROLE_NAME, NEW_MEMBER_GRACE_DAYS } from './config.js';
+import { db } from './db.js';
 import { kstParts, kstDateMinusDays, kstMondayOf } from './time.js';
 import { handleVoiceStateUpdate, recoverOnStartup } from './attendance.js';
 import { registerCommands, handleInteraction } from './commands.js';
@@ -83,6 +84,14 @@ client.once(Events.ClientReady, async (c) => {
         console.error('[join] 환영 메시지 실패:', err.message);
       }
     }
+  });
+
+  // 서버를 떠나면(자진 퇴장·추방 모두 이 이벤트 발생) 경고 초기화 — 재입장 시 새 출발.
+  // 출석 이력은 보존 (경고 카운트만 리셋).
+  client.on(Events.GuildMemberRemove, (m) => {
+    if (m.guild.id !== config.guildId || m.user?.bot) return;
+    db.setWarnings(m.id, 0, new Date().toISOString());
+    console.log(`[leave] ${m.displayName ?? m.id} 퇴장 — 경고 초기화`);
   });
 
   console.log('[ready] 봇 가동 중');
