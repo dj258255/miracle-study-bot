@@ -28,7 +28,7 @@ export async function postWeeklyRanking(ctx) {
   const body = rankingLines(ctx, from, date);
   if (!body.length) return;
   const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
-  ctx.announce(
+  ctx.announceRank(
     [`🏆 **이번 주 출석 랭킹** (${md(from)} ~ ${md(date)})`, ...body, '', '이번 주도 다들 수고했어요! 🔥'].join('\n')
   );
 }
@@ -42,7 +42,7 @@ export async function postMonthlyRanking(ctx) {
   const body = rankingLines(ctx, from, lastDayPrev);
   if (!body.length) return;
   const [y, m] = from.split('-');
-  ctx.announce(
+  ctx.announceRank(
     [`👑 **${y}년 ${Number(m)}월 출석 랭킹**`, ...body, '', '한 달 동안 정말 수고 많았어요! 🎊'].join('\n')
   );
 }

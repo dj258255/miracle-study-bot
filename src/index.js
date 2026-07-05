@@ -29,10 +29,19 @@ client.once(Events.ClientReady, async (c) => {
     throw new Error('ANNOUNCE_CHANNEL_ID가 텍스트 채널이 아닙니다.');
   }
 
+  // 랭킹·레벨업 전용 채널 (미설정/조회 실패 시 출석 공지 채널로 폴백)
+  const rankChannel = config.rankChannelId
+    ? await guild.channels.fetch(config.rankChannelId).catch(() => null)
+    : null;
+
   const ctx = {
     guild,
     announce: (text) =>
       announceChannel.send({ content: text }).catch((err) => console.error('[announce]', err)),
+    announceRank: (text) =>
+      (rankChannel ?? announceChannel)
+        .send({ content: text })
+        .catch((err) => console.error('[rank]', err)),
   };
   // 출석이 새로 인정될 때 레벨 역할 동기화 (attendance.js에서 호출)
   ctx.syncLevel = (userId) =>

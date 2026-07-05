@@ -45,5 +45,5 @@ export async function syncLevelRole(ctx, userId) {
   for (const [, r] of stale) await member.roles.remove(r, '레벨 갱신').catch(() => {});
   await member.roles.add(target, '레벨 달성');
 
-  ctx.announce(`🎉 **${member.displayName}**님 레벨 업! → ${roleNameOf(level)} (누적 출석 ${total}회)`);
+  ctx.announceRank(`🎉 **${member.displayName}**님 레벨 업! → ${roleNameOf(level)} (누적 출석 ${total}회)`);
 }
