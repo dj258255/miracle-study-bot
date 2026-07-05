@@ -53,6 +53,7 @@ export async function handleInteraction(interaction) {
     ];
     const until = db.getExemption(userId);
     if (until && until >= date) lines.push(`- 유예 중: ${until}까지 점검 제외 🛌`);
+    else if (until && until >= weekStart) lines.push(`- 유예 종료 — 이번 주 점검은 면제 🛌 (다음 주부터 다시 적용)`);
 
     await interaction.reply({ content: lines.join('\n'), flags: MessageFlags.Ephemeral });
     return;

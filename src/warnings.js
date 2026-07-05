@@ -6,7 +6,7 @@ import {
   EXEMPT_ROLE_NAME,
 } from './config.js';
 import { db } from './db.js';
-import { kstParts, kstMondayOf } from './time.js';
+import { kstParts, kstMondayOf, kstDateMinusDays } from './time.js';
 
 function isStaff(member) {
   return (
@@ -16,17 +16,22 @@ function isStaff(member) {
   );
 }
 
-function isNewMember(member) {
+// 유예·신입 공통 원칙: 면제 기간이 점검 주(월~일)에 하루라도 걸쳐 있으면 그 주는 점검 면제.
+// → 토요일에 유예가 끝나도 다음날 일요일 점검에 바로 걸리지 않고,
+//   "복귀(가입) 후 첫 온전한 주"부터 점검 대상이 된다.
+
+function isNewMember(member, weekStart) {
   if (!member.joinedTimestamp) return false;
-  const ageMs = Date.now() - member.joinedTimestamp;
-  return ageMs < NEW_MEMBER_GRACE_DAYS * 24 * 60 * 60 * 1000;
+  const joinDate = kstParts(new Date(member.joinedTimestamp)).date;
+  const graceEnd = kstDateMinusDays(joinDate, -NEW_MEMBER_GRACE_DAYS); // 가입일 + 7일
+  return graceEnd >= weekStart;
 }
 
 // 사정 있는 사람 유예: '출석유예' 역할 보유(무기한) 또는 /유예 명령어 등록(기간, 자동 만료).
-function isExempt(member, today) {
+function isExempt(member, weekStart) {
   if (member.roles.cache.some((r) => r.name === EXEMPT_ROLE_NAME)) return true;
   const until = db.getExemption(member.id);
-  return !!until && until >= today;
+  return !!until && until >= weekStart;
 }
 
 // 주간 점검 (매주 일요일 22:05, 저녁 정산 직후): 이번 주(월~일) 출석 3회 미만이면 경고 +1,
@@ -42,8 +47,8 @@ export async function runWeeklyCheck(ctx) {
   for (const [userId, member] of ctx.guild.members.cache) {
     if (member.user.bot) continue;
     if (isStaff(member)) continue;
-    if (isNewMember(member)) continue;
-    if (isExempt(member, date)) continue;
+    if (isNewMember(member, since)) continue;
+    if (isExempt(member, since)) continue;
 
     const count = db.countAttendanceSince(userId, since);
     if (count >= WEEKLY_REQUIRED_DAYS) continue;
