@@ -83,14 +83,22 @@ client.once(Events.ClientReady, async (c) => {
         // 적응 기간(가입+7일)이 걸친 주까지 점검 면제 → 그다음 주 월요일부터 적용
         const graceEnd = kstDateMinusDays(kstParts().date, -NEW_MEMBER_GRACE_DAYS);
         const resume = kstDateMinusDays(kstMondayOf(graceEnd), -7);
-        const byName = (n) =>
-          m.guild.channels.cache.find((c) => c.isTextBased?.() && c.name === n);
-        const notice = byName('공지사항');
-        const guide = byName('명령어-가이드');
+        // 새 멤버는 위로 스크롤하지 않으므로, 환영 멘션이 전체 안내글 역할까지 한다.
+        const link = (n) => {
+          const c = m.guild.channels.cache.find((c) => c.name === n);
+          return c ? `<#${c.id}>` : `#${n}`;
+        };
         await ch.send(
-          `👋 ${m}님, 미라클 알고리즘 스터디에 오신 것을 환영합니다!\n` +
-            `적응 기간이 있어서 출석 점검은 **${resume}(월)부터** 적용돼요 🌱 그 전까지 편하게 둘러보세요.\n` +
-            `스터디 규칙은 ${notice ?? '#공지사항'}, 봇 사용법은 ${guide ?? '#명령어-가이드'} 참고!`
+          `# 👋 ${m}님, 미라클 알고리즘 스터디에 오신 것을 환영합니다!\n\n` +
+            `꾸준한 코딩테스트 학습 습관을 만드는 스터디예요. 아래 순서로 둘러보세요! 🙌\n\n` +
+            `1️⃣ ${link('공지사항')} — 스터디 규칙과 출석 방식 (필독!)\n` +
+            `2️⃣ ${link('명령어-가이드')} — 봇 명령어와 레벨 시스템 안내\n` +
+            `3️⃣ ${link('모각코')} — 스터디 음성채널. 화면 공유를 켜고 각자 문제를 풀어요 💻\n` +
+            `4️⃣ ${link('출석-알림')} — 출근/퇴근/출석이 자동으로 기록되는 곳\n` +
+            `5️⃣ ${link('명예의-전당')} — 주간·월간 출석 랭킹과 레벨업 소식 🏆\n` +
+            `6️⃣ ${link('스터디-대화방')} — 문제 질문·풀이 토론·오늘 푼 문제 공유는 여기서!\n\n` +
+            `🌱 ${m}님의 출석 점검은 **${resume}(월)부터** 적용돼요. 그 전까지는 편하게 적응하시면 됩니다.\n` +
+            `궁금한 점은 운영진에게 편하게 물어봐 주세요! 😊`
         );
         console.log(`[join] ${m.displayName} 환영 인사 (점검 시작 ${resume})`);
       } catch (err) {
