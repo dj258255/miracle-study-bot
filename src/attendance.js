@@ -160,9 +160,9 @@ function scheduleShareReminder(userId, member, ctx) {
     const vs = ctx.guild.members.cache.get(userId)?.voice;
     if (!vs || !isTracked(vs.channel) || vs.streaming) return; // 그새 상태가 바뀜
     state.shareReminded.add(userId);
-    const name = member?.displayName ?? nameOf(userId, ctx);
+    // 본인이 즉시 봐야 하는 안내라 멘션(알림)으로 보낸다 — 시간대당 1회라 도배 없음
     ctx.announce(
-      `🖥️ **${name}**님, 화면 공유가 꺼져 있어요 — 공유를 켜야 공부 시간이 기록됩니다!`
+      `🖥️ <@${userId}> 화면 공유가 꺼져 있어요 — 공유를 켜야 공부 시간이 기록됩니다!`
     );
   }, SHARE_REMIND_MS);
   state.shareTimers.set(userId, timer);
