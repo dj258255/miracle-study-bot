@@ -1,14 +1,22 @@
-import { config, SESSIONS, REQUIRED_MINUTES, LEAVE_DEBOUNCE_MS } from './config.js';
+import {
+  config,
+  SESSIONS,
+  REQUIRED_MINUTES,
+  LEAVE_DEBOUNCE_MS,
+  SHARE_REMIND_MS,
+} from './config.js';
 import { db } from './db.js';
 import { kstParts, sessionAt, sessionEnded, clippedMinutes, fmtDuration } from './time.js';
 
-// 시간대 단위로 유지되는 휘발성 상태.
-//  - timers: 퇴장 후 디바운스 타이머 (userId -> Timeout)
-//  - notified: 이미 퇴근 공지가 나간 유저 (재입장/정산 시 중복 공지 방지)
-// 봇 재시작 시 소실되며, 정산이 이를 보완한다.
+// 기록 조건: 추적 음성채널 접속 + 화면 공유(Go Live) 중.
+// 공유를 끄면 기록이 일시정지되고, 다시 켜면 이어서 누적된다 (구간 합산).
+
+// 시간대 단위로 유지되는 휘발성 상태. 봇 재시작 시 소실되며, 정산이 이를 보완한다.
 const state = {
-  timers: new Map(),
-  notified: new Set(),
+  timers: new Map(),        // 퇴장 후 퇴근 공지 디바운스 (userId -> Timeout)
+  notified: new Set(),      // 이미 퇴근 공지가 나간 유저 (재입장/정산 중복 방지)
+  shareTimers: new Map(),   // 화면 공유 리마인드 대기 (userId -> Timeout)
+  shareReminded: new Set(), // 이번 시간대에 리마인드를 이미 보낸 유저 (도배 방지)
 };
 
 // 기준 시간 라벨 (예: 60분 → "1시간") — 기준값을 바꿔도 메시지가 자동으로 따라온다.
@@ -17,8 +25,11 @@ const REQ_LABEL =
 
 export function resetSessionState() {
   for (const t of state.timers.values()) clearTimeout(t);
+  for (const t of state.shareTimers.values()) clearTimeout(t);
   state.timers.clear();
   state.notified.clear();
+  state.shareTimers.clear();
+  state.shareReminded.clear();
 }
 
 function isTracked(channel) {
@@ -69,27 +80,45 @@ export function handleVoiceStateUpdate(oldState, newState, ctx) {
   if (!session) return; // 시간대 밖은 무시
 
   const userId = newState.id;
-  const wasIn = isTracked(oldState.channel);
-  const nowIn = isTracked(newState.channel);
-
-  if (!wasIn && nowIn) {
-    onJoin(userId, date, session, hm, newState.member, ctx);
-  } else if (wasIn && !nowIn) {
-    onLeave(userId, date, session, hm, oldState.member ?? newState.member, ctx);
-  }
-  // 추적 채널 간 이동(wasIn && nowIn) / 무관한 상태변화 → 무시
-}
-
-function onJoin(userId, date, session, hm, member, ctx) {
+  const member = newState.member ?? oldState.member;
   if (member?.user?.bot) return;
 
-  // 디바운스 대기 중이었다면 취소 (10분 내 복귀)
-  const pending = state.timers.get(userId);
-  if (pending) {
-    clearTimeout(pending);
-    state.timers.delete(userId);
+  const wasIn = isTracked(oldState.channel);
+  const nowIn = isTracked(newState.channel);
+  const wasCounting = wasIn && !!oldState.streaming;
+  const nowCounting = nowIn && !!newState.streaming;
+
+  // 채널 입장/복귀 → 보류 중이던 퇴근 공지 취소 (10분 내 복귀)
+  if (!wasIn && nowIn) {
+    const pending = state.timers.get(userId);
+    if (pending) {
+      clearTimeout(pending);
+      state.timers.delete(userId);
+    }
   }
 
+  // 기록 시작 (화면 공유 ON) / 일시정지 (공유 OFF 또는 퇴장)
+  if (!wasCounting && nowCounting) {
+    cancelShareReminder(userId);
+    startCounting(userId, date, session, hm, member, ctx);
+  } else if (wasCounting && !nowCounting) {
+    db.closeUserOpenSegments(userId, date, session.key, hm);
+  }
+
+  // 채널에 있는데 공유가 꺼져 있음 (입장 직후 포함) → 리마인드 예약
+  if (nowIn && !newState.streaming) scheduleShareReminder(userId, member, ctx);
+
+  // 채널 이탈 → 리마인드 취소 + (기록이 있는 사람만) 퇴근 디바운스
+  if (wasIn && !nowIn) {
+    cancelShareReminder(userId);
+    if (db.countUserSessionSegments(userId, date, session.key) > 0) {
+      scheduleLeaveNotice(userId, date, session, hm, member, ctx);
+    }
+  }
+}
+
+// 화면 공유 시작 = 기록 시작. 시간대 최초면 출근, 퇴근 공지 후면 재입장 공지.
+function startCounting(userId, date, session, hm, member, ctx) {
   const priorCount = db.countUserSessionSegments(userId, date, session.key);
   db.openSegment(userId, date, session.key, hm);
 
@@ -100,14 +129,11 @@ function onJoin(userId, date, session, hm, member, ctx) {
     ctx.announce(`🔄 **${name}**님 ${session.label} 재입장 (${hm})`);
     state.notified.delete(userId);
   }
-  // 그 외(10분 내 복귀, 타이머만 취소된 경우) → 공지 없음
+  // 그 외(공유 껐다 켬, 10분 내 복귀) → 공지 없음
 }
 
-function onLeave(userId, date, session, hm, member, ctx) {
-  if (member?.user?.bot) return;
-
-  db.closeUserOpenSegments(userId, date, session.key, hm);
-
+// 퇴장 후 디바운스 — 재입장 없으면 퇴근 공지.
+function scheduleLeaveNotice(userId, date, session, hm, member, ctx) {
   const existing = state.timers.get(userId);
   if (existing) clearTimeout(existing);
 
@@ -126,12 +152,41 @@ function onLeave(userId, date, session, hm, member, ctx) {
   state.timers.set(userId, timer);
 }
 
-// ── 시간대 시작: 이미 접속 중인 멤버 구간 열기 ──────────────────────────
+// 채널에 있는데 공유가 꺼진 채 일정 시간 지나면 안내 (시간대당 1회).
+function scheduleShareReminder(userId, member, ctx) {
+  if (state.shareReminded.has(userId) || state.shareTimers.has(userId)) return;
+  const timer = setTimeout(() => {
+    state.shareTimers.delete(userId);
+    const vs = ctx.guild.members.cache.get(userId)?.voice;
+    if (!vs || !isTracked(vs.channel) || vs.streaming) return; // 그새 상태가 바뀜
+    state.shareReminded.add(userId);
+    const name = member?.displayName ?? nameOf(userId, ctx);
+    ctx.announce(
+      `🖥️ **${name}**님, 화면 공유가 꺼져 있어요 — 공유를 켜야 공부 시간이 기록됩니다!`
+    );
+  }, SHARE_REMIND_MS);
+  state.shareTimers.set(userId, timer);
+}
+
+function cancelShareReminder(userId) {
+  const t = state.shareTimers.get(userId);
+  if (t) {
+    clearTimeout(t);
+    state.shareTimers.delete(userId);
+  }
+}
+
+// ── 시간대 시작: 이미 접속 중인 멤버 처리 ──────────────────────────────
+// 화면 공유 중인 멤버는 구간을 열고, 아닌 멤버는 리마인드를 예약한다.
 export function openSegmentsForPresentMembers(ctx, session, joinedHm) {
   const { date } = kstParts();
   for (const ch of trackedVoiceChannels(ctx)) {
     for (const [userId, member] of ch.members) {
       if (member.user.bot) continue;
+      if (!member.voice.streaming) {
+        scheduleShareReminder(userId, member, ctx);
+        continue;
+      }
       if (db.hasOpenSegment(userId, date, session.key)) continue;
       const priorCount = db.countUserSessionSegments(userId, date, session.key);
       db.openSegment(userId, date, session.key, joinedHm);
@@ -153,9 +208,11 @@ export function finalizeSession(ctx, date, session, { notify = true } = {}) {
   const key = session.key;
   if (db.isFinalized(date, key)) return;
 
-  // 보류 중이던 디바운스 타이머 정지 — 정산이 공지를 대신한다.
+  // 보류 중이던 타이머 정지 — 정산이 공지를 대신한다.
   for (const t of state.timers.values()) clearTimeout(t);
+  for (const t of state.shareTimers.values()) clearTimeout(t);
   state.timers.clear();
+  state.shareTimers.clear();
 
   db.closeAllOpenSegments(date, key, session.end);
 
@@ -181,6 +238,7 @@ export function finalizeSession(ctx, date, session, { notify = true } = {}) {
 
   db.markFinalized(date, key);
   state.notified.clear();
+  state.shareReminded.clear();
 }
 
 // ── 재시작 복구 ────────────────────────────────────────────────────
@@ -203,7 +261,7 @@ export function recoverOnStartup(ctx) {
     }
   }
 
-  // 3) 지금이 시간대 안이면 접속 중인 멤버 구간을 새로 연다.
+  // 3) 지금이 시간대 안이면 접속 중인(공유 중인) 멤버 구간을 새로 연다.
   if (current) {
     resetSessionState();
     openSegmentsForPresentMembers(ctx, current, hm);

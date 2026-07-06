@@ -37,6 +37,8 @@ export const EXEMPT_ROLE_NAME = process.env.EXEMPT_ROLE_NAME ?? '출석유예';
 export const MEMBER_ROLE_NAME = process.env.MEMBER_ROLE_NAME ?? '스터디원';
 // 퇴장 후 이 시간(ms) 안에 재입장이 없으면 퇴근으로 공지 (테스트 시 DEBOUNCE_MS로 짧게 오버라이드)
 export const LEAVE_DEBOUNCE_MS = Number(process.env.DEBOUNCE_MS ?? 10 * 60 * 1000);
+// 채널에 있는데 화면 공유가 이 시간(ms) 동안 꺼져 있으면 리마인드 (세션당 1회)
+export const SHARE_REMIND_MS = Number(process.env.SHARE_REMIND_MS ?? 3 * 60 * 1000);
 // 주간 점검 크론 — 매주 일요일 22:05 KST (저녁 정산 직후). 이번 주(월~일) 출석을 집계한다.
 export const WEEKLY_CRON = '5 22 * * 0';
 
