@@ -11,6 +11,10 @@ const state = {
   notified: new Set(),
 };
 
+// 기준 시간 라벨 (예: 60분 → "1시간") — 기준값을 바꿔도 메시지가 자동으로 따라온다.
+const REQ_LABEL =
+  REQUIRED_MINUTES % 60 === 0 ? `${REQUIRED_MINUTES / 60}시간` : fmtDuration(REQUIRED_MINUTES);
+
 export function resetSessionState() {
   for (const t of state.timers.values()) clearTimeout(t);
   state.timers.clear();
@@ -114,7 +118,7 @@ function onLeave(userId, date, session, hm, member, ctx) {
     const mark =
       mins >= REQUIRED_MINUTES
         ? '✅ 출석 인정'
-        : '⚠️ 아직 2시간 미만 (재입장하면 이어서 누적돼요)';
+        : `⚠️ 아직 ${REQ_LABEL} 미만 (재입장하면 이어서 누적돼요)`;
     ctx.announce(`🏁 **${name}**님 ${session.label} 퇴근 (${hm}) — 누적 ${fmtDuration(mins)} ${mark}`);
     state.notified.add(userId);
   }, LEAVE_DEBOUNCE_MS);
@@ -170,7 +174,7 @@ export function finalizeSession(ctx, date, session, { notify = true } = {}) {
       let mark;
       if (recognized && preExisting) mark = '✅ 출석 인정 (오늘 이미 인정됨)';
       else if (recognized) mark = '✅ 출석 인정';
-      else mark = '⚠️ 2시간 미만';
+      else mark = `⚠️ ${REQ_LABEL} 미만`;
       ctx.announce(`🏁 **${name}**님 ${session.label} 퇴근 (${leftHm}) — 누적 ${fmtDuration(mins)} ${mark}`);
     }
   }

@@ -23,7 +23,8 @@ export const SESSIONS = {
 };
 
 // 출석 인정 최소 누적 시간 (분) — 테스트 시 REQUIRED_MINUTES로 오버라이드
-export const REQUIRED_MINUTES = Number(process.env.REQUIRED_MINUTES ?? 120);
+// (2026-07-06 기준 완화: 120 → 60. 진입장벽은 낮추고, 경쟁은 랭킹의 누적 시간이 담당)
+export const REQUIRED_MINUTES = Number(process.env.REQUIRED_MINUTES ?? 60);
 // 최근 7일 기준 최소 출석 일수
 export const WEEKLY_REQUIRED_DAYS = 3;
 // 추방 기준 경고 횟수

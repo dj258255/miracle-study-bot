@@ -113,7 +113,7 @@ CREATE TABLE exemptions (
 1. 해당 (날짜, 시간대)의 열린 구간(left_hm IS NULL)을 종료 시각으로 닫는다
 2. 유저별로 구간을 모아 합산:
      구간별 인정 시간 = max(0, min(퇴장, 시간대끝) - max(입장, 시간대시작))
-3. 합계 ≥ 120분 → attendance에 INSERT OR IGNORE (이미 오전 인정이면 무시됨)
+3. 합계 ≥ 60분 → attendance에 INSERT OR IGNORE (이미 오전 인정이면 무시됨)
 4. 공지 — **아직 퇴근 공지가 안 나간 참여자만** (종료까지 접속 중이던 사람 + 디바운스 대기 중이던 사람). 문구는 SPEC.md §6
 5. finalized_sessions에 (날짜, 시간대) 기록 — 완료 표시
 ```
@@ -122,7 +122,7 @@ CREATE TABLE exemptions (
 
 - **재시작 시**: `left_hm IS NULL`인 과거 구간 → 해당 시간대 종료 시각으로 닫기. 현재 시간대 진행 중이면 접속 중인 멤버의 구간을 새로 연다.
 - **정산 누락**(정산 시각에 봇이 꺼져 있던 경우): 시작 시 `voice_segments`에 기록이 있는데 `finalized_sessions`에 없는 과거 (날짜, 시간대)를 찾아 늦은 정산 수행. 정산 성공 시 `finalized_sessions`에 기록하므로 멱등하다.
-  - 주의: `attendance` 존재 여부로 정산 완료를 판별하면 안 된다 — 아무도 2시간을 못 채운 시간대는 attendance 기록이 없어도 정산은 끝난 상태이기 때문. 그래서 별도 테이블을 둔다.
+  - 주의: `attendance` 존재 여부로 정산 완료를 판별하면 안 된다 — 아무도 기준 시간을 못 채운 시간대는 attendance 기록이 없어도 정산은 끝난 상태이기 때문. 그래서 별도 테이블을 둔다.
 
 ## 필요한 디스코드 설정
 
