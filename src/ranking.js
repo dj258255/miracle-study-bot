@@ -25,7 +25,7 @@ function rankingLines(ctx, from, to) {
   });
 }
 
-// 주간 랭킹 — 일요일 22:05 주간 점검 직전에 호출 (이번 주 월~일 집계).
+// 주간 랭킹 — 일요일 밤 주간 점검(WEEKLY_CRON) 직전에 호출 (이번 주 월~일 집계).
 export async function postWeeklyRanking(ctx) {
   await ctx.guild.members.fetch().catch(() => {});
   const { date } = kstParts(); // 일요일

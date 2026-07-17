@@ -35,11 +35,11 @@ function isExempt(member, weekStart) {
   return !!until && until >= weekStart;
 }
 
-// 주간 점검 (매주 일요일 22:05, 저녁 정산 직후): 이번 주(월~일) 출석 3회 미만이면 경고 +1,
+// 주간 점검 (매주 일요일, 마지막 정산 직후 — WEEKLY_CRON): 이번 주(월~일) 출석 3회 미만이면 경고 +1,
 // 경고 3회 도달 시 Kick(+경고 0 초기화).
 export async function runWeeklyCheck(ctx) {
   const { date } = kstParts();
-  // 일요일 22:05 실행 기준: 이번 주 월요일 ~ 오늘(일) = 정확히 이번 주 월~일.
+  // 일요일 밤 실행 기준: 이번 주 월요일 ~ 오늘(일) = 정확히 이번 주 월~일.
   const since = kstMondayOf(date);
   const nowIso = new Date().toISOString();
 

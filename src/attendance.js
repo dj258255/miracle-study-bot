@@ -1,9 +1,9 @@
 import {
   config,
-  SESSIONS,
   REQUIRED_MINUTES,
   LEAVE_DEBOUNCE_MS,
   SHARE_REMIND_MS,
+  sessionByKey,
 } from './config.js';
 import { db } from './db.js';
 import { kstParts, sessionAt, sessionEnded, clippedMinutes, fmtDuration } from './time.js';
@@ -202,7 +202,7 @@ export function startSession(ctx, session) {
   openSegmentsForPresentMembers(ctx, session, session.start);
 }
 
-// ── 정산 (12:00 / 22:00) ───────────────────────────────────────────
+// ── 정산 (각 시간대 종료 시각) ─────────────────────────────────────
 // notify=false: 재시작 시 늦은 정산 — 기록만 하고 채널 공지는 생략.
 export function finalizeSession(ctx, date, session, { notify = true } = {}) {
   const key = session.key;
@@ -247,16 +247,22 @@ export function recoverOnStartup(ctx) {
   const current = sessionAt(hm);
 
   // 1) 미종료 구간 닫기: 현재 진행 중인 시간대면 지금 시각, 아니면 그 시간대 종료 시각으로.
+  //    옛 세션 키(morning/evening)는 LEGACY_SESSIONS로 해석한다.
   for (const seg of db.getAllOpenSegments()) {
     const isCurrent = seg.date === date && current?.key === seg.session;
-    const leftHm = isCurrent ? hm : SESSIONS[seg.session].end;
+    const leftHm = isCurrent ? hm : (sessionByKey(seg.session)?.end ?? hm);
     db.closeSegmentById(seg.id, leftHm);
   }
 
   // 2) 정산 누락 보완: 종료됐는데 finalized 안 된 시간대를 늦게라도 정산(무공지).
   for (const c of db.unfinalizedWithSegments()) {
+    const session = sessionByKey(c.session);
+    if (!session) {
+      console.warn(`[recover] 알 수 없는 세션 키, 건너뜀: ${c.date} ${c.session}`);
+      continue;
+    }
     if (sessionEnded(c.date, c.session, date, hm)) {
-      finalizeSession(ctx, c.date, SESSIONS[c.session], { notify: false });
+      finalizeSession(ctx, c.date, session, { notify: false });
       console.log(`[recover] 늦은 정산: ${c.date} ${c.session}`);
     }
   }

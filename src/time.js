@@ -1,4 +1,4 @@
-import { SESSIONS, TIMEZONE } from './config.js';
+import { SESSIONS, TIMEZONE, sessionByKey } from './config.js';
 
 // 서버 OS 시간대와 무관하게 항상 Asia/Seoul 기준으로 계산한다.
 const dtf = new Intl.DateTimeFormat('en-CA', {
@@ -44,11 +44,13 @@ export function clippedMinutes(joinedHm, leftHm, session) {
   return Math.max(0, l - j);
 }
 
-// 특정 (date, session)이 지금 기준으로 이미 종료됐는지.
+// 특정 (date, session)이 지금 기준으로 이미 종료됐는지. 옛 세션 키(morning/evening)도 해석한다.
 export function sessionEnded(date, sessionKey, today, nowHm) {
   if (date < today) return true;
   if (date > today) return false;
-  return hmToMin(nowHm) >= hmToMin(SESSIONS[sessionKey].end);
+  const session = sessionByKey(sessionKey);
+  if (!session) return true; // 알 수 없는 키는 종료된 것으로 간주 (늦은 정산 대상)
+  return hmToMin(nowHm) >= hmToMin(session.end);
 }
 
 // YYYY-MM-DD 문자열에서 days일 뺀 날짜 문자열.

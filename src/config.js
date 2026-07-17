@@ -17,10 +17,24 @@ export const config = {
 };
 
 // 스터디 시간대 정의 (KST). 테스트 시 start/end만 가까운 시각으로 바꾸면 전체 흐름을 짧게 검증할 수 있다.
+// ⏰ 임시 24시간 운영 (2026-07-17~): 오전/저녁 2개 시간대를 하루 전체 1개로 교체.
+//    end를 '23:50'으로 두는 이유 — '24:00'은 크론식으로 변환할 수 없고,
+//    일요일 주간 점검(WEEKLY_CRON)이 마지막 정산 뒤에 돌 시간 여유가 필요해서.
+//    원복: SESSIONS를 LEGACY_SESSIONS 값으로 되돌리고 WEEKLY_CRON을 '5 22 * * 0'으로.
 export const SESSIONS = {
+  allday: { key: 'allday', label: '종일', emoji: '🕐', start: '00:00', end: '23:50' },
+};
+
+// 과거 운영 시간대 — DB에 남아 있는 옛 구간(morning/evening)의 재시작 복구·늦은 정산 전용.
+export const LEGACY_SESSIONS = {
   morning: { key: 'morning', label: '오전', emoji: '🌅', start: '09:00', end: '12:00' },
   evening: { key: 'evening', label: '저녁', emoji: '🌙', start: '19:00', end: '22:00' },
 };
+
+// DB에 저장된 세션 키를 해석할 때는 반드시 이걸 쓴다 (현행 → 과거 순 조회).
+export function sessionByKey(key) {
+  return SESSIONS[key] ?? LEGACY_SESSIONS[key] ?? null;
+}
 
 // 출석 인정 최소 누적 시간 (분) — 테스트 시 REQUIRED_MINUTES로 오버라이드
 // (2026-07-06 기준 완화: 120 → 60. 진입장벽은 낮추고, 경쟁은 랭킹의 누적 시간이 담당)
@@ -39,8 +53,9 @@ export const MEMBER_ROLE_NAME = process.env.MEMBER_ROLE_NAME ?? '스터디원';
 export const LEAVE_DEBOUNCE_MS = Number(process.env.DEBOUNCE_MS ?? 10 * 60 * 1000);
 // 채널에 있는데 화면 공유가 이 시간(ms) 동안 꺼져 있으면 리마인드 (세션당 1회)
 export const SHARE_REMIND_MS = Number(process.env.SHARE_REMIND_MS ?? 3 * 60 * 1000);
-// 주간 점검 크론 — 매주 일요일 22:05 KST (저녁 정산 직후). 이번 주(월~일) 출석을 집계한다.
-export const WEEKLY_CRON = '5 22 * * 0';
+// 주간 점검 크론 — 매주 일요일 23:55 KST (종일 정산 23:50 직후). 이번 주(월~일) 출석을 집계한다.
+// (임시 24시간 운영에 맞춰 22:05 → 23:55. 원복 시 '5 22 * * 0')
+export const WEEKLY_CRON = '55 23 * * 0';
 
 export const TIMEZONE = 'Asia/Seoul';
 
